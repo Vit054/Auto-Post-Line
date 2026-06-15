@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import hashlib
 import io
-import json
 import os
 import random
 import urllib.parse
@@ -24,7 +23,6 @@ from config import today
 ROOT = Path(__file__).parent
 IMAGES = ROOT / "images"
 FONTS = ROOT / "assets" / "fonts"
-HISTORY = ROOT / "history.json"
 SIZE = 1080
 KEEP_IMAGES = 14
 
@@ -80,19 +78,6 @@ def load_font(name: str, size: int) -> ImageFont.FreeTypeFont:
         return ImageFont.load_default()
 
 
-def load_history() -> list[dict]:
-    if HISTORY.exists():
-        try:
-            return json.loads(HISTORY.read_text("utf-8"))
-        except Exception:  # noqa: BLE001
-            return []
-    return []
-
-
-def save_history(items: list[dict]) -> None:
-    HISTORY.write_text(json.dumps(items[-90:], ensure_ascii=False, indent=2), "utf-8")
-
-
 def prune_old(keep: int = KEEP_IMAGES) -> None:
     files = sorted(IMAGES.glob("*.jpg"))
     for f in files[:-keep]:
@@ -105,17 +90,15 @@ def prune_old(keep: int = KEEP_IMAGES) -> None:
 # --------------------------------------------------------------------------- #
 # content
 # --------------------------------------------------------------------------- #
-def deepseek_greeting(day: str, avoid: list[str]) -> str | None:
+def deepseek_greeting(day: str) -> str | None:
     key = os.environ.get("DEEPSEEK_API_KEY")
     if not key:
         print("DEEPSEEK_API_KEY not set; using fallback greeting.")
         return None
-    avoid_txt = "\n".join(f"- {a}" for a in avoid[-25:]) or "(none yet)"
     prompt = (
         f"Write ONE short, warm good-morning greeting in English for {day}. "
         f"Rules: 6 to 14 words, friendly and uplifting, suitable to fit {day}, "
         f"no hashtags, no emoji, no surrounding quotation marks. "
-        f"It MUST be clearly different from these past greetings:\n{avoid_txt}\n"
         f"Reply with the greeting text only."
     )
     try:
@@ -304,17 +287,16 @@ def main() -> None:
     now, theme = today()
     date = now.strftime("%Y-%m-%d")
     day = theme["day"]
-    seed = int(hashlib.sha256(date.encode()).hexdigest(), 16) % 1_000_000
+    # Seed is derived from the date, so every day gets a different, never-repeating
+    # image. A wide range keeps birthday-paradox collisions negligible over years.
+    seed = int(hashlib.sha256(date.encode()).hexdigest(), 16) % (2 ** 31 - 1)
 
-    history = load_history()
-    avoid = [h["text"] for h in history]
-
-    greeting = deepseek_greeting(day, avoid)
+    # Greeting text may repeat day to day — that's fine. Only the image must be unique.
+    greeting = deepseek_greeting(day)
     if not greeting:
-        random.seed(seed)
-        pool = [g.format(day=day) for g in FALLBACK_GREETINGS]
-        fresh = [g for g in pool if g not in avoid] or pool
-        greeting = random.choice(fresh)
+        greeting = random.Random(seed).choice(
+            [g.format(day=day) for g in FALLBACK_GREETINGS]
+        )
 
     img = pollinations_image(theme, seed) or floral_art(theme, seed)
     final = compose(img, day, greeting, theme).convert("RGB")
@@ -327,8 +309,6 @@ def main() -> None:
         q -= 8
         final.save(out, "JPEG", quality=q, optimize=True)
 
-    history.append({"date": date, "day": day, "text": greeting})
-    save_history(history)
     prune_old()
 
     print(f"Day      : {day}")

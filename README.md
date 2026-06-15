@@ -1,7 +1,7 @@
 # Auto Post Line — Morning Greeting 🌼
 
 ส่งภาพ **"Good Morning"** ดอกไม้สีตามวัน (ตามความเชื่อสีมงคลไทย) เข้า LINE ทุกเช้า **07:00 น. (เวลาไทย)** อัตโนมัติ
-ข้อความทักทายภาษาอังกฤษถูกสร้างใหม่ทุกวัน **ไม่ซ้ำกัน** ด้วย DeepSeek และภาพดอกไม้สร้างด้วย AI (Pollinations)
+**ภาพไม่ซ้ำกันทุกวัน** (seed ผูกกับวันที่) ส่วนข้อความทักทายภาษาอังกฤษสร้างด้วย DeepSeek (ซ้ำได้)
 
 | วัน | สีมงคล | วัน | สีมงคล |
 |-----|--------|-----|--------|
@@ -14,13 +14,13 @@
 
 ```
 07:00 ไทย → GitHub Actions (cron)
-   ├─ generate.py : DeepSeek → ข้อความ + Pollinations → ภาพดอกไม้ + Pillow ใส่ข้อความ
+   ├─ generate.py : DeepSeek → ข้อความ + Pillow วาดภาพดอกไม้ (seed = วันที่ → ไม่ซ้ำ)
    ├─ commit ภาพเข้า repo (ได้ public URL ผ่าน raw.githubusercontent.com)
    └─ send.py     : LINE Messaging API multicast → userId ที่ตั้งไว้
 ```
 
 - `config.py` — ธีมสีประจำวัน
-- `generate.py` — สร้างภาพ + ข้อความ บันทึก `images/<วันที่>.jpg` และกันซ้ำผ่าน `history.json`
+- `generate.py` — สร้างภาพ + ข้อความ บันทึก `images/<วันที่>.jpg` (ภาพไม่ซ้ำเพราะ seed = วันที่)
 - `send.py` — ส่งภาพเข้า LINE
 - `.github/workflows/morning.yml` — ตั้งเวลา + ขั้นตอนทั้งหมด
 
